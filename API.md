@@ -12,6 +12,23 @@ http://localhost:3000
 DISCORD_TOKEN=your_bot_token
 GUILD_ID=your_guild_id
 CHANNEL_ID=your_channel_id
+CODE_WORD=your_secret_code_word
+PORT=3000
+```
+
+## Аутентификация
+
+Все запросы к API должны содержать кодовое слово в заголовке:
+```
+X-Code-Word: your_secret_code_word
+```
+
+Если кодовое слово отсутствует или неверно, API вернет ошибку 401:
+```json
+{
+  "error": "Unauthorized",
+  "message": "Неверное кодовое слово"
+}
 ```
 
 ## Эндпоинты
@@ -32,33 +49,10 @@ GET /guilds
 ]
 ```
 
-### Получение информации о сервере
+### Получение списка пользователей
 ```
-GET /guild?guildId=optional_guild_id
+GET /users
 ```
-
-**Параметры запроса:**
-- `guildId` (опционально) - ID сервера Discord. Если не указан, используется значение из переменной окружения `GUILD_ID`
-
-**Ответ:**
-```json
-{
-  "id": "string",
-  "name": "string",
-  "icon": "string | null",
-  "memberCount": number,
-  "ownerId": "string",
-  "createdAt": "string"
-}
-```
-
-### Получение списка пользователей сервера
-```
-GET /users?guildId=optional_guild_id
-```
-
-**Параметры запроса:**
-- `guildId` (опционально) - ID сервера Discord. Если не указан, используется значение из переменной окружения `GUILD_ID`
 
 **Ответ:**
 ```json
@@ -79,13 +73,27 @@ GET /users?guildId=optional_guild_id
 ]
 ```
 
-### Отправка сообщения
+### Получение информации о сервере
 ```
-POST /messages?channelId=optional_channel_id
+GET /guild
 ```
 
-**Параметры запроса:**
-- `channelId` (опционально) - ID канала Discord. Если не указан, используется значение из переменной окружения `CHANNEL_ID`
+**Ответ:**
+```json
+{
+  "id": "string",
+  "name": "string",
+  "icon": "string | null",
+  "memberCount": number,
+  "ownerId": "string",
+  "createdAt": "string"
+}
+```
+
+### Отправка сообщения
+```
+POST /messages
+```
 
 **Тело запроса:**
 ```json
@@ -106,13 +114,10 @@ POST /messages?channelId=optional_channel_id
 }
 ```
 
-### Получение сообщений канала
+### Получение сообщений
 ```
-GET /messages?channelId=optional_channel_id
+GET /messages
 ```
-
-**Параметры запроса:**
-- `channelId` (опционально) - ID канала Discord. Если не указан, используется значение из переменной окружения `CHANNEL_ID`
 
 **Ответ:**
 ```json
@@ -131,56 +136,65 @@ GET /messages?channelId=optional_channel_id
 ]
 ```
 
-## Коды ошибок
+## Обработка ошибок
 
-- `400` - Неверный запрос (отсутствует обязательный параметр или неверный формат)
-- `401` - Не авторизован (неверный токен или отсутствуют права)
-- `403` - Доступ запрещен (бот не имеет доступа к серверу/каналу)
-- `404` - Ресурс не найден (сервер/канал не существует)
-- `500` - Внутренняя ошибка сервера
+Все API эндпоинты возвращают стандартные HTTP коды состояния:
+- 200: Успешный запрос
+- 400: Неверные параметры запроса
+- 401: Не авторизован (неверное кодовое слово)
+- 404: Ресурс не найден
+- 500: Внутренняя ошибка сервера
+
+При ошибке возвращается JSON объект:
+```json
+{
+  "error": "string",
+  "message": "string"
+}
+```
 
 ## Примеры использования
 
 ### Получение списка серверов
 ```javascript
-fetch('http://localhost:3000/guilds')
+fetch('http://localhost:3000/guilds', {
+  headers: {
+    'X-Code-Word': 'your_secret_code_word'
+  }
+})
   .then(response => response.json())
   .then(guilds => console.log(guilds));
 ```
 
 ### Получение информации о сервере
 ```javascript
-// Использование ID сервера из переменных окружения
-fetch('http://localhost:3000/guild')
-  .then(response => response.json())
-  .then(guild => console.log(guild));
-
-// Использование указанного ID сервера
-fetch('http://localhost:3000/guild?guildId=123456789')
+fetch('http://localhost:3000/guild', {
+  headers: {
+    'X-Code-Word': 'your_secret_code_word'
+  }
+})
   .then(response => response.json())
   .then(guild => console.log(guild));
 ```
 
-### Получение пользователей сервера
+### Получение списка пользователей
 ```javascript
-// Использование ID сервера из переменных окружения
-fetch('http://localhost:3000/users')
-  .then(response => response.json())
-  .then(users => console.log(users));
-
-// Использование указанного ID сервера
-fetch('http://localhost:3000/users?guildId=123456789')
+fetch('http://localhost:3000/users', {
+  headers: {
+    'X-Code-Word': 'your_secret_code_word'
+  }
+})
   .then(response => response.json())
   .then(users => console.log(users));
 ```
 
 ### Отправка сообщения
 ```javascript
-// Использование ID канала из переменных окружения
 fetch('http://localhost:3000/messages', {
   method: 'POST',
   headers: {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'X-Code-Word': 'your_secret_code_word'
   },
   body: JSON.stringify({
     content: 'Привет!',
@@ -189,33 +203,18 @@ fetch('http://localhost:3000/messages', {
       roles: ['987654321']
     }
   })
-});
-
-// Использование указанного ID канала
-fetch('http://localhost:3000/messages?channelId=123456789', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    content: 'Привет!',
-    mentions: {
-      users: ['123456789'],
-      roles: ['987654321']
-    }
-  })
-});
+})
+  .then(response => response.json())
+  .then(result => console.log(result));
 ```
 
-### Получение сообщений канала
+### Получение сообщений
 ```javascript
-// Использование ID канала из переменных окружения
-fetch('http://localhost:3000/messages')
-  .then(response => response.json())
-  .then(messages => console.log(messages));
-
-// Использование указанного ID канала
-fetch('http://localhost:3000/messages?channelId=123456789')
+fetch('http://localhost:3000/messages', {
+  headers: {
+    'X-Code-Word': 'your_secret_code_word'
+  }
+})
   .then(response => response.json())
   .then(messages => console.log(messages));
 ```
@@ -228,10 +227,7 @@ fetch('http://localhost:3000/messages?channelId=123456789')
 4. Некоторые эндпоинты могут требовать определенных прав доступа бота на сервере
 5. При упоминании пользователей или ролей, их ID должны быть действительными и существовать на сервере
 6. Упоминания будут автоматически заменены на соответствующие теги в Discord
-7. ID сервера берется из переменной окружения `GUILD_ID` в файле `.env`
-8. ID канала берется из переменной окружения `CHANNEL_ID` в файле `.env`
-9. Токен бота берется из переменной окружения `DISCORD_TOKEN` в файле `.env`
-10. При указании параметров запроса они имеют приоритет над значениями из переменных окружения
-11. Все даты возвращаются в формате ISO 8601
-12. Сообщения возвращаются в порядке от новых к старым
-13. По умолчанию возвращаются последние 20 сообщений 
+7. ID сервера берется из переменной окружения `GUILD_ID`
+8. ID канала берется из переменной окружения `CHANNEL_ID`
+9. Токен бота берется из переменной окружения `DISCORD_TOKEN`
+10. Кодовое слово берется из переменной окружения `CODE_WORD`

@@ -1,9 +1,19 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const { Client, GatewayIntentBits } = require('discord.js');
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import { Client, GatewayIntentBits } from 'discord.js';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-// Отладочный вывод
+// Проверка необходимых переменных окружения
+const requiredEnvVars = ['DISCORD_TOKEN', 'GUILD_ID', 'CHANNEL_ID'];
+for (const envVar of requiredEnvVars) {
+    if (!process.env[envVar]) {
+        console.error(`Ошибка: Отсутствует переменная окружения ${envVar}`);
+        process.exit(1);
+    }
+}
+
 console.log('CHANNEL_ID:', process.env.CHANNEL_ID);
 console.log('GUILD_ID:', process.env.GUILD_ID);
 
@@ -12,6 +22,8 @@ app.use(cors());
 app.use(express.json());
 
 // Для обслуживания статических файлов
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 app.use(express.static('public'));
 
 const client = new Client({
@@ -23,23 +35,50 @@ const client = new Client({
     ]
 });
 
+// Обработка ошибок подключения к Discord
+client.on('error', error => {
+    console.error('Ошибка Discord клиента:', error);
+});
+
+client.on('warn', warning => {
+    console.warn('Предупреждение Discord клиента:', warning);
+});
+
 // Обработка сообщений
 client.on('messageCreate', async (message) => {
-    // Игнорируем сообщения от ботов
-    if (message.author.bot) return;
+    try {
+        // Игнорируем сообщения от ботов
+        if (message.author.bot) return;
+        
+        // Проверяем, что сообщение в нужном канале
+        if (message.channel.id !== process.env.CHANNEL_ID) return;
 
-    // Проверяем, содержит ли сообщение приветствие
-    const greetings = ['привет', 'здравствуй', 'хай', 'hello', 'hi', 'здравствуйте'];
-    const messageContent = message.content.toLowerCase();
-    
-    if (greetings.some(greeting => messageContent.includes(greeting))) {
-        try {
+        // Проверяем, содержит ли сообщение приветствие
+        const greetings = ['привет', 'здравствуй', 'хай', 'hello', 'hi', 'здравствуйте'];
+        const messageContent = message.content.toLowerCase();
+        
+        if (greetings.some(greeting => messageContent.includes(greeting))) {
             await message.reply('Добро пожаловать! Рад вас видеть!');
-        } catch (error) {
-            console.error('Ошибка при отправке ответа:', error);
         }
+    } catch (error) {
+        console.error('Ошибка при обработке сообщения:', error);
     }
 });
+
+// Middleware для проверки кодового слова
+const checkCodeWord = (req, res, next) => {
+    const codeWord = req.headers['x-code-word'];
+    if (!codeWord || codeWord !== process.env.CODE_WORD) {
+        return res.status(401).json({
+            error: 'Unauthorized',
+            message: 'Неверное кодовое слово'
+        });
+    }
+    next();
+};
+
+// Применяем middleware ко всем API маршрутам
+app.use('/api', checkCodeWord);
 
 // Маршрут для получения списка серверов
 app.get('/guilds', async (req, res) => {
@@ -161,34 +200,75 @@ app.get('/messages', async (req, res) => {
         }
 
         const messages = await channel.messages.fetch({ limit: 20 });
-        const messageList = messages.map(msg => ({
-            id: msg.id,
-            author: {
-                id: msg.author.id,
-                username: msg.author.username,
-                avatar: msg.author.displayAvatarURL()
-            },
-            content: msg.content,
-            timestamp: msg.createdAt,
-            botResponse: msg.reference && msg.reference.messageId ? 
-                messages.get(msg.reference.messageId)?.content : null
-        }));
+        const messageList = messages.map(msg => {
+            let botResponse = null;
+            
+            // Проверяем наличие ссылки на сообщение
+            if (msg.reference && msg.reference.messageId) {
+                try {
+                    // Пытаемся найти сообщение в кэше
+                    const referencedMessage = messages.get(msg.reference.messageId);
+                    if (referencedMessage) {
+                        botResponse = referencedMessage.content;
+                    } else {
+                        // Если сообщение не найдено в кэше, пытаемся получить его
+                        channel.messages.fetch(msg.reference.messageId)
+                            .then(refMsg => {
+                                botResponse = refMsg.content;
+                            })
+                            .catch(error => {
+                                console.error('Ошибка при получении ссылочного сообщения:', error);
+                                botResponse = '[Сообщение недоступно]';
+                            });
+                    }
+                } catch (error) {
+                    console.error('Ошибка при обработке ссылки на сообщение:', error);
+                    botResponse = '[Ошибка при получении сообщения]';
+                }
+            }
+
+            return {
+                id: msg.id,
+                author: {
+                    id: msg.author.id,
+                    username: msg.author.username,
+                    avatar: msg.author.displayAvatarURL()
+                },
+                content: msg.content,
+                timestamp: msg.createdAt,
+                botResponse: botResponse,
+                reference: msg.reference ? {
+                    messageId: msg.reference.messageId,
+                    channelId: msg.reference.channelId,
+                    guildId: msg.reference.guildId
+                } : null
+            };
+        });
 
         res.json(messageList);
     } catch (error) {
+        console.error('Ошибка при получении сообщений:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// Запуск бота
-client.once('ready', () => {
-    console.log(`Бот ${client.user.tag} успешно запущен!`);
-});
-
-client.login(process.env.DISCORD_TOKEN);
-
-// Запуск сервера
+// Запуск сервера с обработкой ошибок
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Сервер запущен на порту ${PORT}`);
-}); 
+client.login(process.env.DISCORD_TOKEN)
+    .then(() => {
+        const server = app.listen(PORT, () => {
+            console.log(`Сервер запущен на порту ${PORT}`);
+            console.log(`URL: http://localhost:${PORT}`);
+            console.log(`Бот ${client.user.tag} успешно запущен!`);
+        });
+
+        // Обработка ошибок сервера
+        server.on('error', (error) => {
+            console.error('Ошибка сервера:', error);
+            process.exit(1);
+        });
+    })
+    .catch(error => {
+        console.error('Ошибка при запуске бота:', error);
+        process.exit(1);
+    }); 
