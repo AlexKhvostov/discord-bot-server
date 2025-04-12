@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Users Lite</title>
+    <style>
+        :root {
+            --discord-bg: #36393f;
+            --discord-secondary: #2f3136;
+            --discord-text: #dcddde;
+            --discord-text-secondary: #b9bbbe;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--discord-bg);
+            color: var(--discord-text);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            background-color: var(--discord-secondary);
+            border-radius: 8px;
+        }
+
+        .section {
+            background-color: var(--discord-secondary);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: var(--discord-text);
+        }
+
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: var(--discord-secondary);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .users-table th,
+        .users-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--discord-bg);
+        }
+
+        .users-table th {
+            background-color: var(--discord-bg);
+            font-weight: bold;
+        }
+
+        .users-table tr:hover {
+            background-color: var(--discord-bg);
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            vertical-align: middle;
+        }
+
+        .roles-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .role-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #fff;
+        }
+
+        .user-id {
+            font-family: monospace;
+            color: var(--discord-text-secondary);
+        }
+
+        .message-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group label {
+            color: var(--discord-text);
+            font-weight: bold;
+        }
+
+        .form-group textarea {
+            padding: 10px;
+            border-radius: 4px;
+            border: none;
+            background-color: var(--discord-bg);
+            color: var(--discord-text);
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .mentions-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        .mentions-group {
+            flex: 1;
+        }
+
+        .mentions-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        .mention-tag {
+            background-color: var(--discord-bg);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .mention-tag:hover {
+            background-color: #5865f2;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: none;
+            background-color: #5865f2;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #4752c4;
+        }
+
+        .status-message {
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .status-message.success {
+            background-color: #43b581;
+            display: block;
+        }
+
+        .status-message.error {
+            background-color: #f04747;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Discord Users Lite</h1>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">Пользователи сервера</h2>
+            <table class="users-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Аватар</th>
+                        <th>Ник</th>
+                        <th>Ник на сервере</th>
+                        <th>Роли</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                    <!-- Данные пользователей будут добавлены динамически -->
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">Отправить сообщение</h2>
+            <form class="message-form" id="messageForm">
+                <div class="form-group">
+                    <label for="messageContent">Текст сообщения:</label>
+                    <textarea id="messageContent" required></textarea>
+                </div>
+
+                <div class="mentions-container">
+                    <div class="mentions-group">
+                        <label>Упоминания пользователей:</label>
+                        <div class="mentions-list" id="userMentions"></div>
+                    </div>
+                    <div class="mentions-group">
+                        <label>Упоминания ролей:</label>
+                        <div class="mentions-list" id="roleMentions"></div>
+                    </div>
+                </div>
+
+                <button type="submit">Отправить</button>
+                <div class="status-message" id="statusMessage"></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000';
+        let users = [];
+
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_URL}/users`);
+                users = await response.json();
+                displayUsers(users);
+                updateMentions();
+            } catch (error) {
+                console.error('Ошибка при загрузке пользователей:', error);
+            }
+        }
+
+        function displayUsers(users) {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = users.map(user => `
+                <tr>
+                    <td class="user-id">${user.id}</td>
+                    <td><img src="${user.avatar}" alt="avatar" class="user-avatar"></td>
+                    <td>${user.username}</td>
+                    <td>${user.nickname || '-'}</td>
+                    <td>
+                        <div class="roles-container">
+                            ${user.roles.map(role => `
+                                <span class="role-badge" style="background-color: ${role.color}">
+                                    ${role.name}
+                                </span>
+                            `).join('')}
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function updateMentions() {
+            const userMentions = document.getElementById('userMentions');
+            const roleMentions = document.getElementById('roleMentions');
+
+            // Собираем уникальные роли
+            const uniqueRoles = new Map();
+            users.forEach(user => {
+                user.roles.forEach(role => {
+                    if (!uniqueRoles.has(role.id)) {
+                        uniqueRoles.set(role.id, role);
+                    }
+                });
+            });
+
+            userMentions.innerHTML = users.map(user => `
+                <span class="mention-tag" data-id="${user.id}" data-type="user">
+                    @${user.username}
+                </span>
+            `).join('');
+
+            roleMentions.innerHTML = Array.from(uniqueRoles.values()).map(role => `
+                <span class="mention-tag" data-id="${role.id}" data-type="role">
+                    @${role.name}
+                </span>
+            `).join('');
+
+            // Добавляем обработчики кликов для упоминаний
+            document.querySelectorAll('.mention-tag').forEach(tag => {
+                tag.addEventListener('click', () => {
+                    const id = tag.dataset.id;
+                    const type = tag.dataset.type;
+                    const textarea = document.getElementById('messageContent');
+                    const cursorPos = textarea.selectionStart;
+                    const text = textarea.value;
+                    const mention = type === 'user' ? `<@${id}>` : `<@&${id}>`;
+                    
+                    textarea.value = text.substring(0, cursorPos) + mention + text.substring(cursorPos);
+                    textarea.focus();
+                    textarea.selectionStart = cursorPos + mention.length;
+                    textarea.selectionEnd = cursorPos + mention.length;
+                });
+            });
+        }
+
+        document.getElementById('messageForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const content = document.getElementById('messageContent').value;
+            const statusMessage = document.getElementById('statusMessage');
+
+            try {
+                const response = await fetch(`${API_URL}/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        content,
+                        mentions: {
+                            users: extractMentions(content, 'user'),
+                            roles: extractMentions(content, 'role')
+                        }
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    statusMessage.textContent = 'Сообщение успешно отправлено!';
+                    statusMessage.className = 'status-message success';
+                    document.getElementById('messageContent').value = '';
+                } else {
+                    throw new Error(result.error || 'Ошибка при отправке сообщения');
+                }
+            } catch (error) {
+                statusMessage.textContent = `Ошибка: ${error.message}`;
+                statusMessage.className = 'status-message error';
+            }
+
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 5000);
+        });
+
+        function extractMentions(content, type) {
+            const regex = type === 'user' ? /<@(\d+)>/g : /<@&(\d+)>/g;
+            const mentions = [];
+            let match;
+            while ((match = regex.exec(content)) !== null) {
+                mentions.push(match[1]);
+            }
+            return mentions;
+        }
+
+        // Загружаем пользователей при загрузке страницы
+        loadUsers();
+    </script>
+</body>
+</html> 

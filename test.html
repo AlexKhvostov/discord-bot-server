@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Bot Test Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #36393f;
+            color: #dcddde;
+        }
+        .container {
+            background-color: #2f3136;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #ffffff;
+            text-align: center;
+        }
+        .function-block {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #40444b;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #5865f2;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #4752c4;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            background-color: #40444b;
+            border: 1px solid #202225;
+            border-radius: 4px;
+            color: #dcddde;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #2f3136;
+            border-radius: 4px;
+            min-height: 50px;
+        }
+        .server-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Discord Bot Test Interface</h1>
+    
+    <div class="container">
+        <div class="function-block">
+            <h2>1. Выбор сервера</h2>
+            <div class="server-info">
+                <select id="guildSelect" onchange="updateGuildInfo()">
+                    <option value="">Выберите сервер</option>
+                </select>
+                <button onclick="loadGuilds()">Обновить список серверов</button>
+            </div>
+            <div id="guildInfo" class="result"></div>
+        </div>
+
+        <div class="function-block">
+            <h2>2. Список пользователей</h2>
+            <button onclick="getUsers()">Получить список пользователей</button>
+            <div id="usersResult" class="result"></div>
+        </div>
+
+        <div class="function-block">
+            <h2>3. Отправка сообщения в канал</h2>
+            <input type="text" id="channelId" placeholder="ID канала">
+            <textarea id="channelMessage" placeholder="Текст сообщения"></textarea>
+            <button onclick="sendToChannel()">Отправить в канал</button>
+            <div id="channelResult" class="result"></div>
+        </div>
+
+        <div class="function-block">
+            <h2>4. Отправка личного сообщения</h2>
+            <input type="text" id="userId" placeholder="ID пользователя">
+            <textarea id="dmMessage" placeholder="Текст сообщения"></textarea>
+            <button onclick="sendDM()">Отправить личное сообщение</button>
+            <div id="dmResult" class="result"></div>
+        </div>
+
+        <div class="function-block">
+            <h2>5. Чтение сообщений</h2>
+            <input type="text" id="readChannelId" placeholder="ID канала для чтения">
+            <button onclick="readMessages()">Читать сообщения</button>
+            <div id="readResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000';
+        let currentGuildId = '';
+
+        async function loadGuilds() {
+            try {
+                const response = await fetch(`${API_URL}/guilds`);
+                const guilds = await response.json();
+                
+                const select = document.getElementById('guildSelect');
+                select.innerHTML = '<option value="">Выберите сервер</option>';
+                
+                guilds.forEach(guild => {
+                    const option = document.createElement('option');
+                    option.value = guild.id;
+                    option.textContent = `${guild.name} (${guild.memberCount} участников)`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Ошибка при загрузке серверов:', error);
+            }
+        }
+
+        function updateGuildInfo() {
+            const select = document.getElementById('guildSelect');
+            currentGuildId = select.value;
+            const selectedOption = select.options[select.selectedIndex];
+            document.getElementById('guildInfo').innerHTML = 
+                selectedOption.value ? `Выбран сервер: ${selectedOption.textContent}` : 'Сервер не выбран';
+        }
+
+        async function getUsers() {
+            if (!currentGuildId) {
+                document.getElementById('usersResult').innerHTML = 'Пожалуйста, выберите сервер';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/users/${currentGuildId}`);
+                const data = await response.json();
+                
+                const usersHtml = data.map(user => `
+                    <div class="user-card" style="
+                        background: #2f3136;
+                        padding: 15px;
+                        margin: 10px 0;
+                        border-radius: 8px;
+                        border-left: 4px solid ${user.status === 'online' ? '#43b581' : 
+                                            user.status === 'idle' ? '#faa61a' : 
+                                            user.status === 'dnd' ? '#f04747' : '#747f8d'};
+                    ">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <img src="${user.avatar}" alt="avatar" style="width: 50px; height: 50px; border-radius: 50%;">
+                            <div>
+                                <h3 style="margin: 0; color: #fff;">${user.tag}</h3>
+                                <p style="margin: 5px 0; color: #b9bbbe;">ID: ${user.id}</p>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 10px;">
+                            <p style="margin: 5px 0;"><strong>Статус:</strong> ${user.status}</p>
+                            ${user.nickname ? `<p style="margin: 5px 0;"><strong>Никнейм:</strong> ${user.nickname}</p>` : ''}
+                            <p style="margin: 5px 0;"><strong>Присоединился:</strong> ${new Date(user.joinedAt).toLocaleString()}</p>
+                            
+                            <div style="margin: 10px 0;">
+                                <strong>Роли:</strong>
+                                <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px;">
+                                    ${user.roles.map(role => `
+                                        <span style="
+                                            background-color: ${role.color};
+                                            color: #fff;
+                                            padding: 2px 8px;
+                                            border-radius: 12px;
+                                            font-size: 12px;
+                                        ">${role.name}</span>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            ${user.activities.length > 0 ? `
+                                <div style="margin: 10px 0;">
+                                    <strong>Активность:</strong>
+                                    ${user.activities.map(activity => `
+                                        <p style="margin: 5px 0;">${activity.name} - ${activity.type}</p>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+
+                            ${user.voiceChannel ? `
+                                <div style="margin: 10px 0;">
+                                    <strong>Голосовой канал:</strong> ${user.voiceChannel}
+                                    ${user.isDeafened ? '🔇' : ''}
+                                    ${user.isMuted ? '🤐' : ''}
+                                </div>
+                            ` : ''}
+
+                            ${user.lastMessage ? `
+                                <div style="margin: 10px 0;">
+                                    <strong>Последнее сообщение:</strong>
+                                    <p style="margin: 5px 0; color: #b9bbbe;">${user.lastMessage}</p>
+                                    <small style="color: #72767d;">${new Date(user.lastMessageTimestamp).toLocaleString()}</small>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('');
+
+                document.getElementById('usersResult').innerHTML = usersHtml;
+            } catch (error) {
+                document.getElementById('usersResult').innerHTML = 
+                    `<div style="color: #f04747;">Ошибка: ${error.message}</div>`;
+            }
+        }
+
+        async function sendToChannel() {
+            const channelId = document.getElementById('channelId').value;
+            const message = document.getElementById('channelMessage').value;
+            
+            try {
+                const response = await fetch(`${API_URL}/send-channel`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ channelId, message })
+                });
+                const data = await response.json();
+                document.getElementById('channelResult').innerHTML = 
+                    `Результат: ${JSON.stringify(data)}`;
+            } catch (error) {
+                document.getElementById('channelResult').innerHTML = 
+                    `Ошибка: ${error.message}`;
+            }
+        }
+
+        async function sendDM() {
+            const userId = document.getElementById('userId').value;
+            const message = document.getElementById('dmMessage').value;
+            
+            try {
+                const response = await fetch(`${API_URL}/send-dm`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ userId, message })
+                });
+                const data = await response.json();
+                document.getElementById('dmResult').innerHTML = 
+                    `Результат: ${JSON.stringify(data)}`;
+            } catch (error) {
+                document.getElementById('dmResult').innerHTML = 
+                    `Ошибка: ${error.message}`;
+            }
+        }
+
+        async function readMessages() {
+            const channelId = document.getElementById('readChannelId').value;
+            
+            try {
+                const response = await fetch(`${API_URL}/read-messages/${channelId}`);
+                const data = await response.json();
+                document.getElementById('readResult').innerHTML = 
+                    `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('readResult').innerHTML = 
+                    `Ошибка: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html> 
