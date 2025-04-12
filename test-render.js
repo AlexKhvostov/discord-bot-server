@@ -1,11 +1,22 @@
 import fetch from 'node-fetch';
 
 const API_URL = 'https://discord-bot-server-o6g1.onrender.com';
+const CODE_WORD = '8f!nQr$9@ZcK2';
+
+const headers = {
+    'X-Code-Word': CODE_WORD
+};
 
 async function testEndpoint(name, url, options = {}) {
     try {
         console.log(`\nТестирование ${name}:`);
-        const response = await fetch(url, options);
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                ...headers,
+                ...options.headers
+            }
+        });
         console.log(`Статус: ${response.status}`);
         if (response.ok) {
             const data = await response.json();

@@ -77,8 +77,14 @@ const checkCodeWord = (req, res, next) => {
     next();
 };
 
-// Применяем middleware ко всем API маршрутам
-app.use('/api', checkCodeWord);
+// Применяем middleware ко всем маршрутам, кроме статических файлов
+app.use((req, res, next) => {
+    if (req.path.startsWith('/public/')) {
+        next();
+    } else {
+        checkCodeWord(req, res, next);
+    }
+});
 
 // Маршрут для получения списка серверов
 app.get('/guilds', async (req, res) => {

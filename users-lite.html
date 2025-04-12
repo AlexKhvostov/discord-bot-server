@@ -236,11 +236,16 @@
 
     <script>
         const API_URL = 'http://localhost:3000';
+        const CODE_WORD = '8f!nQr$9@ZcK2';
         let users = [];
 
         async function loadUsers() {
             try {
-                const response = await fetch(`${API_URL}/users`);
+                const response = await fetch(`${API_URL}/users`, {
+                    headers: {
+                        'X-Code-Word': CODE_WORD
+                    }
+                });
                 users = await response.json();
                 displayUsers(users);
                 updateMentions();
@@ -250,11 +255,14 @@
         }
 
         function displayUsers(users) {
-            const tbody = document.getElementById('usersTableBody');
-            tbody.innerHTML = users.map(user => `
-                <tr>
+            const tableBody = document.getElementById('usersTableBody');
+            tableBody.innerHTML = '';
+
+            users.forEach(user => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
                     <td class="user-id">${user.id}</td>
-                    <td><img src="${user.avatar}" alt="avatar" class="user-avatar"></td>
+                    <td><img src="${user.avatar}" alt="Avatar" class="user-avatar"></td>
                     <td>${user.username}</td>
                     <td>${user.nickname || '-'}</td>
                     <td>
@@ -266,8 +274,9 @@
                             `).join('')}
                         </div>
                     </td>
-                </tr>
-            `).join('');
+                `;
+                tableBody.appendChild(row);
+            });
         }
 
         function updateMentions() {
@@ -317,39 +326,39 @@
         document.getElementById('messageForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const content = document.getElementById('messageContent').value;
-            const statusMessage = document.getElementById('statusMessage');
+            const selectedUsers = Array.from(document.querySelectorAll('#userMentions .mention-tag.selected'))
+                .map(tag => tag.dataset.id);
+            const selectedRoles = Array.from(document.querySelectorAll('#roleMentions .mention-tag.selected'))
+                .map(tag => tag.dataset.id);
 
             try {
                 const response = await fetch(`${API_URL}/messages`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'X-Code-Word': CODE_WORD
                     },
                     body: JSON.stringify({
                         content,
                         mentions: {
-                            users: extractMentions(content, 'user'),
-                            roles: extractMentions(content, 'role')
+                            users: selectedUsers,
+                            roles: selectedRoles
                         }
                     })
                 });
 
                 const result = await response.json();
                 if (result.success) {
-                    statusMessage.textContent = 'Сообщение успешно отправлено!';
-                    statusMessage.className = 'status-message success';
+                    showStatus('Сообщение успешно отправлено!', 'success');
                     document.getElementById('messageContent').value = '';
+                    clearMentions();
                 } else {
-                    throw new Error(result.error || 'Ошибка при отправке сообщения');
+                    showStatus('Ошибка при отправке сообщения', 'error');
                 }
             } catch (error) {
-                statusMessage.textContent = `Ошибка: ${error.message}`;
-                statusMessage.className = 'status-message error';
+                console.error('Ошибка при отправке сообщения:', error);
+                showStatus('Ошибка при отправке сообщения', 'error');
             }
-
-            setTimeout(() => {
-                statusMessage.style.display = 'none';
-            }, 5000);
         });
 
         function extractMentions(content, type) {

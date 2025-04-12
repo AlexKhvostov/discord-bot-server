@@ -1,62 +1,74 @@
-const fetch = require('node-fetch');
+import fetch from 'node-fetch';
 
 const API_URL = 'http://localhost:3000';
+const CODE_WORD = '8f!nQr$9@ZcK2';
+
+const headers = {
+    'X-Code-Word': CODE_WORD
+};
 
 async function testMessages() {
     try {
-        // Тест отправки сообщения с упоминаниями
-        console.log('1. Тест отправки сообщения с упоминаниями:');
-        const messageWithMentions = await fetch(`${API_URL}/messages`, {
+        // Тест отправки сообщения с упоминанием пользователя
+        console.log('1. Тест отправки сообщения с упоминанием пользователя:');
+        const userMentionResponse = await fetch(`${API_URL}/messages`, {
             method: 'POST',
             headers: {
+                ...headers,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                content: 'Тестовое сообщение с упоминаниями @user1 @role1',
+                content: 'Тестовое сообщение с упоминанием пользователя',
                 mentions: {
-                    users: ['123456789'], // Замените на реальный ID пользователя
-                    roles: ['987654321']  // Замените на реальный ID роли
-                }
-            })
-        });
-        console.log('Результат отправки с упоминаниями:', await messageWithMentions.json());
-
-        // Тест отправки сообщения в другой канал
-        console.log('\n2. Тест отправки сообщения в другой канал:');
-        const messageInOtherChannel = await fetch(`${API_URL}/messages?channelId=123456789`, { // Замените на реальный ID канала
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                content: 'Тестовое сообщение в другой канал',
-                mentions: {
-                    users: [],
+                    users: ['664892407476650026'],
                     roles: []
                 }
             })
         });
-        console.log('Результат отправки в другой канал:', await messageInOtherChannel.json());
+        const userMentionResult = await userMentionResponse.json();
+        console.log('Результат:', userMentionResult);
 
-        // Тест получения сообщений с проверкой ссылок
-        console.log('\n3. Тест получения сообщений с проверкой ссылок:');
-        const messagesResponse = await fetch(`${API_URL}/messages`);
-        const messages = await messagesResponse.json();
-        
-        // Проверяем наличие ссылок в сообщениях
-        messages.forEach(msg => {
-            console.log(`\nСообщение ID: ${msg.id}`);
-            console.log('Содержимое:', msg.content);
-            console.log('Ответ бота:', msg.botResponse);
-            if (msg.reference) {
-                console.log('Ссылка на сообщение:', msg.reference);
-            }
+        // Тест отправки сообщения с упоминанием роли
+        console.log('\n2. Тест отправки сообщения с упоминанием роли:');
+        const roleMentionResponse = await fetch(`${API_URL}/messages`, {
+            method: 'POST',
+            headers: {
+                ...headers,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                content: 'Тестовое сообщение с упоминанием роли',
+                mentions: {
+                    users: [],
+                    roles: ['1311451323690127381']
+                }
+            })
         });
+        const roleMentionResult = await roleMentionResponse.json();
+        console.log('Результат:', roleMentionResult);
+
+        // Тест отправки сообщения с упоминанием пользователя и роли
+        console.log('\n3. Тест отправки сообщения с упоминанием пользователя и роли:');
+        const bothMentionResponse = await fetch(`${API_URL}/messages`, {
+            method: 'POST',
+            headers: {
+                ...headers,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                content: 'Тестовое сообщение с упоминанием пользователя и роли',
+                mentions: {
+                    users: ['664892407476650026'],
+                    roles: ['1311451323690127381']
+                }
+            })
+        });
+        const bothMentionResult = await bothMentionResponse.json();
+        console.log('Результат:', bothMentionResult);
 
     } catch (error) {
-        console.error('Ошибка при тестировании сообщений:', error);
+        console.error('Ошибка при тестировании:', error);
     }
 }
 
-// Запуск тестов
 testMessages(); 
