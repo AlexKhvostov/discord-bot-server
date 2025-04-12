@@ -58,9 +58,9 @@ app.get('/guilds', async (req, res) => {
 // Маршрут для получения списка пользователей сервера
 app.get('/users', async (req, res) => {
     try {
-        const guildId = process.env.GUILD_ID;
+        const guildId = req.query.guildId || process.env.GUILD_ID;
         if (!guildId) {
-            return res.status(400).json({ error: 'ID сервера не указан в переменных окружения' });
+            return res.status(400).json({ error: 'ID сервера не указан' });
         }
 
         const guild = await client.guilds.fetch(guildId);
@@ -116,9 +116,9 @@ app.get('/guild', async (req, res) => {
 // Маршрут для отправки сообщения в канал
 app.post('/messages', async (req, res) => {
     try {
-        const channelId = process.env.CHANNEL_ID;
+        const channelId = req.query.channelId || process.env.CHANNEL_ID;
         if (!channelId) {
-            return res.status(400).json({ error: 'ID канала не указан в переменных окружения' });
+            return res.status(400).json({ error: 'ID канала не указан' });
         }
 
         const { content, mentions } = req.body;
@@ -150,9 +150,9 @@ app.post('/messages', async (req, res) => {
 // Маршрут для получения последних сообщений канала
 app.get('/messages', async (req, res) => {
     try {
-        const channelId = process.env.CHANNEL_ID;
+        const channelId = req.query.channelId || process.env.CHANNEL_ID;
         if (!channelId) {
-            return res.status(400).json({ error: 'ID канала не указан в переменных окружения' });
+            return res.status(400).json({ error: 'ID канала не указан' });
         }
 
         const channel = await client.channels.fetch(channelId);
